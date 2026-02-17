@@ -1,0 +1,59 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: veloura-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: veloura
+      POSTGRES_PASSWORD: veloura
+      POSTGRES_DB: veloura
+    ports:
+      - "5433:5432"
+    volumes:
+      - veloura_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U veloura -d veloura"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: veloura-server
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: file:/data/dev.db
+      PORT: 5001
+      NODE_ENV: production
+      CLIENT_URL: http://localhost:8080
+    ports:
+      - "5002:5001"
+    volumes:
+      - veloura_sqlite:/data
+    command: sh -c "npx prisma migrate deploy && node prisma/seed.js || true; node src/index.js"
+
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ""
+    container_name: veloura-client
+    restart: unless-stopped
+    depends_on:
+      - server
+    ports:
+      - "8080:80"
+
+volumes:
+  veloura_pg:
+  veloura_sqlite:
+
+# code layout
+
+# code layout
